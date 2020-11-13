@@ -1,6 +1,7 @@
 """
 This module is a naive implementation of an AVL tree, which is a balanced binary tree,
 cf. https://en.wikipedia.org/wiki/AVL_tree
+It allows for composite data types by having the less_than_func as a parameter.
 """
 
 from node import AVLNode
@@ -13,15 +14,28 @@ class AVLTree:
     preorder, inorder or postorder
     The remaining methods are auxiliary/internal and should not be used outside
     """
-    def __init__(self, less_than_func):
+    def __init__(self, less_than_func, iterative=True):
+        """
+        - head (the head of the tree) is initialised to None
+        - to_be_deleted_value_node is only used when deleting from the tree and then it points
+        to the node holding the value to be deleted
+        - inc is the increment factor indicating whether the subtree has increased in height.
+        Is in the interval [-1..1]
+        :param less_than_func: Function taking two parameters of same type as values in the tree.
+            Returns True if and only if the first parameter is evaluated to be less then the second
+        """
         self.head = None
         self.less_than_func = less_than_func
         self.to_be_deleted_value_node = None
         self.inc = 0
+        if iterative:
+            self.insertion_method = self._iterative_insert
+        else:
+            self.insertion_method = self._recursive_insert
 
-    def adjust_pointers(self, parent_node, current_node, new_node):
+    def _adjust_pointers(self, parent_node, current_node, new_node):
         """
-        Routine for finalising a rotation by fixing the rotated subtree on to the remaining tree
+        Internal routine for finalising a rotation by fixing the rotated subtree to remaining tree
         :param parent_node: The node pointing to the rebalanced subtree
         :param current_node: The current subtree root node to be balanced down the subtree
         :param new_node: The new subtree root node
@@ -34,29 +48,46 @@ class AVLTree:
         else:
             self.head = new_node
 
-    def singlerotation(self, parent_node, current_node, delete=False):
-        # Move subtrees around
+    def _singlerotation(self, parent_node, current_node, delete=False):
+        """
+        Internal routine for performing a single rotation either left or right, depending on
+        the balance factor of current_node
+        :param parent_node: The node pointing to the node to be rotated down in the tree
+        :param current_node: The node to tbe rotated down in the tree
+        :param delete: Is True, if called in connection with a deletion
+        :return: None
+        """
         if current_node.balance == -1:
+            # Right rotation
             new_top_node = current_node.left
             current_node.left = new_top_node.right
             new_top_node.right = current_node
         else:
+            # Left rotation
             new_top_node = current_node.right
             current_node.right = new_top_node.left
             new_top_node.left = current_node
         # Adjust balance values
         if delete and new_top_node.balance == 0:
+            # Special case for adjusting self.inc (based on balance factor of current_node
             new_top_node.balance = -current_node.balance
             self.inc = 0
         else:
             current_node.balance = 0
             new_top_node.balance = 0
-        # Adjust the pointer to the new top node
-        self.adjust_pointers(parent_node, current_node, new_top_node)
+        # Adjust the parent node's pointer to the new top node
+        self._adjust_pointers(parent_node, current_node, new_top_node)
 
-    def doublerotation(self, parent_node, current_node):
-        # Move subtrees around
+    def _doublerotation(self, parent_node, current_node):
+        """
+        Internal routine for performing a double rotation either left-right or right-left,
+        depending on the balance factor of current_node
+        :param parent_node: The node pointing to the node to be rotated down in the tree
+        :param current_node: The node to be rotated down in the tree
+        :return: None
+        """
         if current_node.balance == -1:
+            # Left-right rotation
             new_top_node = current_node.left.right
             remain_node = current_node.left
             current_node.left.right = new_top_node.left
@@ -64,6 +95,7 @@ class AVLTree:
             current_node.left = new_top_node.right
             new_top_node.right = current_node
         else:
+            # Right-left rotation
             new_top_node = current_node.right.left
             remain_node = current_node.right
             current_node.right.left = new_top_node.right
@@ -84,9 +116,14 @@ class AVLTree:
             raise ValueError("AVL invariance broken!!")
         new_top_node.balance = 0
         # Adjust the pointer to the new top node
-        self.adjust_pointers(parent_node, current_node, new_top_node)
+        self._adjust_pointers(parent_node, current_node, new_top_node)
 
     def _find_parent(self, child_node):
+        """
+        Internal routine for finding the parent of child_node. Only used in iterative case
+        :param child_node: A node in the tree
+        :return: The node pointing to child_node. Returns head if child_node is head
+        """
         if child_node == self.head:
             return self.head
         candidate = self.head
@@ -99,8 +136,18 @@ class AVLTree:
                 candidate = candidate.right
 
     def _iterative_insert(self, parent_node, current_node, value):
+        """
+        The modules version of the insertion in to an AVL tree. It maintains the tree balanced
+        (i.e. maintains the AVL invariant) by adjusting the balance factors of affected nodes
+        and rebalancing the tree, as necessary
+        :param parent_node: The node pointing to current_node
+        :param current_node: The current place in the tree
+        :param value: The new value to be inserted in the tree
+        :return: None
+        """
         place_found = False
         while not place_found:
+            # Find where value fits in the tree and insert a node there with value
             if self.less_than_func(value, current_node.value):
                 if current_node.left:
                     parent_node = current_node
@@ -134,9 +181,9 @@ class AVLTree:
             elif current_node.balance == self.inc:
                 if (self.inc == -1 and current_node.left.balance == -current_node.balance) or \
                         (self.inc == 1 and current_node.right.balance == -current_node.balance):
-                    self.doublerotation(parent_node, current_node)
+                    self._doublerotation(parent_node, current_node)
                 else:
-                    self.singlerotation(parent_node, current_node)
+                    self._singlerotation(parent_node, current_node)
                 self.inc = 0
             if current_node == self.head:
                 break
@@ -144,7 +191,17 @@ class AVLTree:
             parent_node = self._find_parent(parent_node)
 
     def _recursive_insert(self, parent_node, current_node, value):
-        # Find the right place in the tree to insert the new value
+        """
+        The recursive version of the insertion in to an AVL tree. It maintains the tree balanced
+        (i.e. maintains the AVL invariant) by adjusting the balance factors of affected nodes
+        and rebalancing the tree, as necessary
+        :param parent_node: The node pointing to current_node
+        :param current_node: The current place in the tree
+        :param value: The new value to be inserted in the tree
+        :return: None
+
+        """
+        # Find where value fits in the tree and insert a node there with value
         if self.less_than_func(value, current_node.value):
             if current_node.left:
                 self._recursive_insert(current_node, current_node.left, value)
@@ -157,6 +214,7 @@ class AVLTree:
                 self._recursive_insert(current_node, current_node.right, value)
                 self.inc = abs(self.inc)
             else:
+                # base case: place found
                 current_node.right = AVLNode(value)
                 self.inc = 1
         else:  # value exists already (equal to current_node.value); value shall be ignored
@@ -171,16 +229,22 @@ class AVLTree:
             elif current_node.balance == self.inc:
                 if (self.inc == -1 and current_node.left.balance == -current_node.balance) or \
                         (self.inc == 1 and current_node.right.balance == -current_node.balance):
-                    self.doublerotation(parent_node, current_node)
+                    self._doublerotation(parent_node, current_node)
                 else:
-                    self.singlerotation(parent_node, current_node)
+                    self._singlerotation(parent_node, current_node)
                 self.inc = 0
 
     def insert(self, value):
+        """
+        Public routine for inserting value in to the tree. Uses modules or recursive approach
+        as
+        :param value: Value to be inserted in tree
+        :return: None
+        """
         if not self.head:
             self.head = AVLNode(value)
         else:
-            self._iterative_insert(self.head, self.head, value)
+            self.insertion_method(self.head, self.head, value)
 
     def _recursive_delete(self, parent_node, current_node, value):
         if self.to_be_deleted_value_node:  # Value to be deleted found further up in the tree
@@ -193,7 +257,7 @@ class AVLTree:
                     self.inc = 1
                 elif parent_node.right == current_node:
                     self.inc = -1
-                self.adjust_pointers(parent_node, current_node, current_node.left)
+                self._adjust_pointers(parent_node, current_node, current_node.left)
                 return  # No need to re-balance the potential subtree of the deleted node
         else:
             if current_node:
@@ -204,13 +268,14 @@ class AVLTree:
                     self._recursive_delete(current_node, current_node.right, value)
                     self.inc = -abs(self.inc)
                 else:
-                    self.to_be_deleted_value_node = current_node  # Value to be deleted is current node
+                    # Value to be deleted is in current node
+                    self.to_be_deleted_value_node = current_node
                     if not current_node.left:
                         if parent_node.left == current_node:
                             self.inc = 1
                         elif parent_node.right == current_node:
                             self.inc = -1
-                        self.adjust_pointers(parent_node, current_node, current_node.right)
+                        self._adjust_pointers(parent_node, current_node, current_node.right)
                         return  # No need to re-balance the potential subtree of the deleted node
                     self._recursive_delete(current_node, current_node.left, value)
                     self.inc = abs(self.inc)
@@ -227,10 +292,10 @@ class AVLTree:
             elif current_node.balance == self.inc:
                 if (self.inc == -1 and current_node.left.balance == -current_node.balance) or \
                         (self.inc == 1 and current_node.right.balance == -current_node.balance):
-                    self.doublerotation(parent_node, current_node)
+                    self._doublerotation(parent_node, current_node)
                     self.inc = -1
                 else:
-                    self.singlerotation(parent_node, current_node, delete=True)
+                    self._singlerotation(parent_node, current_node, delete=True)
 
     def delete(self, value):
         if not self.head:

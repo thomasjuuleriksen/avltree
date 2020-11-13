@@ -16,4 +16,5 @@ class AVLNode:
             right_val = self.right.value
         else:
             right_val = None
-        return f'<Node {self.value}>; balance={self.balance}; (left tree top: {left_val}; right tree top: {right_val})'
+        return f'<Node {self.value}>; balance={self.balance}; /' \
+               f'(left tree top: {left_val}; right tree top: {right_val})'
