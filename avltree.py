@@ -118,57 +118,44 @@ class AVLTree:
         # Adjust the pointer to the new top node
         self._adjust_pointers(parent_node, current_node, new_top_node)
 
-    def _find_parent(self, child_node):
-        """
-        Internal routine for finding the parent of child_node. Only used in iterative case
-        :param child_node: A node in the tree
-        :return: The node pointing to child_node. Returns head if child_node is head
-        """
-        if child_node == self.head:
-            return self.head
-        candidate = self.head
-        while True:
-            if child_node in {candidate.left, candidate.right}:
-                return candidate
-            if self.less_than_func(child_node.value, candidate.value):
-                candidate = candidate.left
-            elif self.less_than_func(candidate.value, child_node.value):
-                candidate = candidate.right
-
     def _iterative_insert(self, parent_node, current_node, value):
         """
-        The modules version of the insertion in to an AVL tree. It maintains the tree balanced
+        The iterative version of the insertion in to an AVL tree. It maintains the tree balanced
         (i.e. maintains the AVL invariant) by adjusting the balance factors of affected nodes
-        and rebalancing the tree, as necessary
-        :param parent_node: The node pointing to current_node
-        :param current_node: The current place in the tree
+        and rebalancing the tree, as necessary.
+        The nodes visited on the way down are remembered in a list, so the way back up needs
+        no searching: the parent of path[i] is path[i - 1]
+        :param parent_node: Not used; kept so both insertion methods are called the same way
+        :param current_node: The current place in the tree (the head when called from insert)
         :param value: The new value to be inserted in the tree
         :return: None
         """
-        place_found = False
-        while not place_found:
+        path = [current_node]
+        while True:
             # Find where value fits in the tree and insert a node there with value
             if self.less_than_func(value, current_node.value):
                 if current_node.left:
-                    parent_node = current_node
                     current_node = current_node.left
+                    path.append(current_node)
                 else:
                     current_node.left = AVLNode(value)
                     self.inc = -1
-                    place_found = True
+                    break
             elif self.less_than_func(current_node.value, value):
                 if current_node.right:
-                    parent_node = current_node
                     current_node = current_node.right
+                    path.append(current_node)
                 else:
                     current_node.right = AVLNode(value)
                     self.inc = 1
-                    place_found = True
+                    break
             else:  # value equal to current_node.value; value shall be ignored
                 self.inc = 0
-                place_found = True
-        while self.inc != 0:
-            # height of subtree changed
+                return
+        for i in range(len(path) - 1, -1, -1):
+            # height of subtree changed; walk back up the remembered path
+            current_node = path[i]
+            parent_node = path[i - 1] if i > 0 else current_node  # the head is its own parent, as in insert
             if current_node.balance == 0:
                 current_node.balance = self.inc
                 if current_node == parent_node.left:
@@ -185,10 +172,8 @@ class AVLTree:
                 else:
                     self._singlerotation(parent_node, current_node)
                 self.inc = 0
-            if current_node == self.head:
+            if self.inc == 0:
                 break
-            current_node = parent_node
-            parent_node = self._find_parent(parent_node)
 
     def _recursive_insert(self, parent_node, current_node, value):
         """

@@ -138,6 +138,20 @@ class MyTestCase(unittest.TestCase):
         l.sort()
         self.assertEqual(l, t.inorder())
 
+    def test_iterative_and_recursive_insert_build_identical_trees(self):
+        def shape(node):  # value and balance of every node, in preorder
+            return [] if node is None else [(node.value, node.balance)] + shape(node.left) + shape(node.right)
+
+        l = random.Random(2020).choices(range(2000), k=3000)  # includes duplicates
+        t_iterative = AVLTree(lambda x, y: x < y, iterative=True)
+        t_recursive = AVLTree(lambda x, y: x < y, iterative=False)
+        for e in l:
+            t_iterative.insert(e)
+            t_recursive.insert(e)
+        self.assertEqual(shape(t_recursive.head), shape(t_iterative.head))
+        self.assertEqual(True, check_invariant(t_iterative))
+        self.assertEqual(sorted(set(l)), t_iterative.inorder())
+
     def test_simple_delete_value_in_head_no_subtree(self):
         t = AVLTree(lambda x, y: x < y)
         l = [100]
