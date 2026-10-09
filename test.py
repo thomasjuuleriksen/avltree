@@ -272,6 +272,79 @@ class AVLTreeTests:
             avl_invariant_intact = check_invariant(t) and avl_invariant_intact
         self.assertEqual(True, avl_invariant_intact)
 
+    def test_find_in_empty_tree(self):
+        t = self.make_tree(lambda x, y: x < y)
+        self.assertEqual((False, None), t.find(100))
+        t.insert(100)
+        t.delete(100)
+        self.assertEqual((False, None), t.find(100))
+
+    def test_find_existing_values(self):
+        t = self.make_tree(lambda x, y: x < y)
+        l = [50, 30, 70, 20, 40, 60, 80, 10, 35, 65, 90]  # head, inner nodes, leaves, smallest and largest
+        for e in l:
+            t.insert(e)
+        for e in l:
+            found, node = t.find(e)
+            self.assertEqual(True, found)
+            self.assertEqual(e, node.value)
+
+    def test_find_missing_values(self):
+        t = self.make_tree(lambda x, y: x < y)
+        l = [50, 30, 70, 20, 40, 60, 80, 10, 35, 65, 90]
+        for e in l:
+            t.insert(e)
+        for e in [5, 95, 25, 55, 66, 31]:  # below the smallest, above the largest, and in gaps
+            self.assertEqual((False, None), t.find(e))
+
+    def test_find_does_not_change_tree(self):
+        t = self.make_tree(lambda x, y: x < y)
+        l = [100, 50, 200, 30, 70, 150, 300, 20, 40, 60, 80, 120, 170, 250, 400, 110, 160, 180, 155]
+        for e in l:
+            t.insert(e)
+        before = shape(t.head)
+        for e in l + [0, 1000, 65, 175]:
+            t.find(e)
+        self.assertEqual(before, shape(t.head))
+
+    def test_find_after_deletes(self):
+        t = self.make_tree(lambda x, y: x < y)
+        l = [100, 50, 150, 40, 60, 125, 160, 30, 55, 70, 180, 65, 80]
+        for e in l:
+            t.insert(e)
+        deleted = [100, 60, 30, 180]  # the head, a node with two subtrees, and leaves
+        for e in deleted:
+            t.delete(e)
+        for e in l:
+            found, node = t.find(e)
+            if e in deleted:
+                self.assertEqual((False, None), (found, node))
+            else:
+                self.assertEqual((True, e), (found, node.value))
+
+    def test_find_dict_values(self):
+        def less_than_func(d1, d2):
+            return (d1["year"], d1["month"], d1["day"], d1["pid"]) < (d2["year"], d2["month"], d2["day"], d2["pid"])
+
+        t = self.make_tree(less_than_func)
+        p1 = {"Name": "Joe Brown", "Gender": "Male", "year": 1978, "month": 12, "day": 26, "pid": 7933}
+        p2 = {"Name": "Charlotte Vest", "Gender": "Female", "year": 1979, "month": 12, "day": 26, "pid": 8712}
+        p3 = {"Name": "Kate Bush", "Gender": "Female", "year": 1977, "month": 4, "day": 12, "pid": 9004}
+        for p in (p1, p2, p3):
+            t.insert(p)
+        found, node = t.find({"year": 1979, "month": 12, "day": 26, "pid": 8712})  # key fields only
+        self.assertEqual((True, p2), (found, node.value))
+        self.assertEqual((False, None), t.find({"year": 1979, "month": 12, "day": 26, "pid": 1}))
+
+    def test_find_large_tree(self):
+        t = self.make_tree(lambda x, y: x < y)
+        values = random.sample(range(1000000000), 10000)
+        stored, missing = values[:5000], values[5000:]
+        for e in stored:
+            t.insert(e)
+        self.assertEqual(True, all(t.find(e)[0] for e in stored))
+        self.assertEqual(False, any(t.find(e)[0] for e in missing))
+
 
 class IterativeAVLTreeTests(AVLTreeTests, unittest.TestCase):
     ITERATIVE = True
