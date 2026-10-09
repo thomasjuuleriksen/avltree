@@ -27,9 +27,23 @@ def check_invariant(tree):
         return True
 
 
-class MyTestCase(unittest.TestCase):
+def shape(node):
+    """Value and balance factor of every node, in preorder"""
+    return [] if node is None else [(node.value, node.balance)] + shape(node.left) + shape(node.right)
+
+
+class AVLTreeTests:
+    """
+    The tests for one way of running the tree. Not a TestCase itself, so it only runs through
+    the subclasses below, once with the iterative and once with the recursive routines
+    """
+    ITERATIVE = None
+
+    def make_tree(self, less_than_func):
+        return AVLTree(less_than_func, iterative=self.ITERATIVE)
+
     def test_insert_singlerotations(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [20, 10, 5, 80, 15, 100, 2, 1, 12, 11, 120, 0]
         for e in l:
             t.insert(e)
@@ -41,7 +55,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(t.postorder(), expected_result_postorder)
 
     def test_insert_right_doublerotation_head_balanced(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [6, 8, 7]
         for e in l:
             t.insert(e)
@@ -50,7 +64,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_insert_left_doublerotation_head_balanced(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [6, 4, 5]
         for e in l:
             t.insert(e)
@@ -59,7 +73,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_insert_right_doublerotation_head_right_heavy(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 200, 70, 150, 300, 120, 170, 250, 160]
         for e in l:
             t.insert(e)
@@ -68,7 +82,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_insert_left_doublerotation_head_left_heavy(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 200, 30, 70, 150, 20, 60, 80, 90]
         for e in l:
             t.insert(e)
@@ -77,7 +91,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_insert_right_doublerotation_subtree_right_heavy(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [600, 200, 900, 150, 300, 800, 950, 120, 170, 250, 400, 700, 850, 920, 1000, 220, 270, 500, 230]
         for e in l:
             t.insert(e)
@@ -86,7 +100,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_insert_left_doublerotation_subtree_left_heavy(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 200, 30, 70, 150, 300, 20, 40, 60, 80, 120, 170, 250, 400, 110, 160, 180, 155]
         for e in l:
             t.insert(e)
@@ -101,7 +115,7 @@ class MyTestCase(unittest.TestCase):
                 (d1["year"] == d2["year"] and d1["month"] == d2["month"] and d1["day"] < d2["day"]) or \
                 (d1["year"] == d2["year"] and d1["month"] == d2["month"] and d1["day"] == d2["day"] and d1["pid"] < d2["pid"])
 
-        t = AVLTree(less_than_func)
+        t = self.make_tree(less_than_func)
         p1 = {"Name": "Joe Brown", "Gender": "Male", "year": 1978, "month": 12, "day": 26, "pid": 7933}
         t.insert(p1)
         p2 = {"Name": "Charlotte Vest", "Gender": "Female", "year": 1979, "month": 12, "day": 26, "pid": 8712}
@@ -117,7 +131,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_insert_existing_values(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 200, 30, 70, 150, 300, 20, 40, 60, 80, 120, 170, 250, 400, 110, 160, 180, 155]
         for e in l:
             t.insert(e)
@@ -128,7 +142,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_insert_large_tree(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = random.sample(range(1000000000), 5000)
         avl_invariant_intact = True
         for e in l:
@@ -138,22 +152,8 @@ class MyTestCase(unittest.TestCase):
         l.sort()
         self.assertEqual(l, t.inorder())
 
-    def test_iterative_and_recursive_insert_build_identical_trees(self):
-        def shape(node):  # value and balance of every node, in preorder
-            return [] if node is None else [(node.value, node.balance)] + shape(node.left) + shape(node.right)
-
-        l = random.Random(2020).choices(range(2000), k=3000)  # includes duplicates
-        t_iterative = AVLTree(lambda x, y: x < y, iterative=True)
-        t_recursive = AVLTree(lambda x, y: x < y, iterative=False)
-        for e in l:
-            t_iterative.insert(e)
-            t_recursive.insert(e)
-        self.assertEqual(shape(t_recursive.head), shape(t_iterative.head))
-        self.assertEqual(True, check_invariant(t_iterative))
-        self.assertEqual(sorted(set(l)), t_iterative.inorder())
-
     def test_simple_delete_value_in_head_no_subtree(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100]
         for e in l:
             t.insert(e)
@@ -162,7 +162,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_simple_delete_value_in_leaf_no_rebalance(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 200, 50, 300, 20]
         for e in l:
             t.insert(e)
@@ -171,7 +171,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_delete_value_in_head_replace_w_leaf_node_no_rebalance(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 150, 40, 60, 125, 160, 30, 55, 70, 180, 65, 80]
         for e in l:
             t.insert(e)
@@ -182,7 +182,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_delete_value_in_head_replace_w_subtree_node_no_rebalance(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 150, 40, 60, 125, 160, 30, 55, 70, 180, 65]
         for e in l:
             t.insert(e)
@@ -193,7 +193,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_delete_left_doublerotation_head_left_heavy(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [6, 2, 8, 3]
         for e in l:
             t.insert(e)
@@ -204,7 +204,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_delete_right_doublerotation_head_left_heavy(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [6, 3, 8, 2, 5, 10, 4]
         for e in l:
             t.insert(e)
@@ -215,7 +215,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_delete_multiple_left_singlerotations(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 500, 30, 70, 300, 700, 20, 40, 60, 80, 200, 400, 600, 10, 25, 35, 45, 55, 65, 150, 250, 5, 12]
         for e in l:
             t.insert(e)
@@ -226,7 +226,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_delete_multiple_right_singlerotations(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 500, 30, 70, 300, 700, 20, 40, 60, 80, 200, 400, 600, 900, 90, 350, 450, 550, 650, 850, 950, 925, 1000]
         for e in l:
             t.insert(e)
@@ -237,7 +237,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_delete_multiple_right_doublerotations(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 500, 30, 70, 300, 700, 20, 40, 60, 80, 200, 400, 600, 900, 90, 350, 550, 650, 950, 625]
         for e in l:
             t.insert(e)
@@ -248,12 +248,12 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, check_invariant(t))
 
     def test_delete_nonexistent_value_empty_tree(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         with self.assertRaises(ValueError):
             t.delete(201)
 
     def test_delete_nonexistent_value_populated_tree(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = [100, 50, 500, 30, 70, 300, 700, 20, 40, 60, 80, 200, 400, 600, 900, 90, 350, 550, 650, 950, 625]
         for e in l:
             t.insert(e)
@@ -261,7 +261,7 @@ class MyTestCase(unittest.TestCase):
             t.delete(201)
 
     def test_insert_large_tree_delete_all(self):
-        t = AVLTree(lambda x, y: x < y)
+        t = self.make_tree(lambda x, y: x < y)
         l = random.sample(range(1000000000), 5000)
         for e in l:
             t.insert(e)
@@ -271,6 +271,64 @@ class MyTestCase(unittest.TestCase):
             t.delete(e)
             avl_invariant_intact = check_invariant(t) and avl_invariant_intact
         self.assertEqual(True, avl_invariant_intact)
+
+
+class IterativeAVLTreeTests(AVLTreeTests, unittest.TestCase):
+    ITERATIVE = True
+
+
+class RecursiveAVLTreeTests(AVLTreeTests, unittest.TestCase):
+    ITERATIVE = False
+
+
+class IterativeVsRecursiveTests(unittest.TestCase):
+    """The iterative and recursive routines must give identical trees and results"""
+
+    def test_insert_builds_identical_trees(self):
+        l = random.Random(2020).choices(range(2000), k=3000)  # includes duplicates
+        t_iterative = AVLTree(lambda x, y: x < y, iterative=True)
+        t_recursive = AVLTree(lambda x, y: x < y, iterative=False)
+        for e in l:
+            t_iterative.insert(e)
+            t_recursive.insert(e)
+        self.assertEqual(shape(t_recursive.head), shape(t_iterative.head))
+        self.assertEqual(True, check_invariant(t_iterative))
+        self.assertEqual(sorted(set(l)), t_iterative.inorder())
+
+    def test_delete_gives_identical_trees(self):
+        rng = random.Random(2021)
+        t_iterative = AVLTree(lambda x, y: x < y, iterative=True)
+        t_recursive = AVLTree(lambda x, y: x < y, iterative=False)
+        for _ in range(5000):
+            e = rng.randint(0, 300)
+            if rng.random() < 0.45:  # delete, sometimes a value that is not in the tree
+                outcomes = []
+                for t in (t_iterative, t_recursive):
+                    try:
+                        t.delete(e)
+                        outcomes.append("deleted")
+                    except ValueError as err:
+                        outcomes.append(str(err))
+                self.assertEqual(outcomes[1], outcomes[0])
+            else:
+                t_iterative.insert(e)
+                t_recursive.insert(e)
+            self.assertEqual(shape(t_recursive.head), shape(t_iterative.head))
+        self.assertEqual(True, check_invariant(t_iterative))
+
+    def test_find_gives_identical_results(self):
+        l = random.Random(2022).sample(range(2000), 1000)
+        t_iterative = AVLTree(lambda x, y: x < y, iterative=True)
+        t_recursive = AVLTree(lambda x, y: x < y, iterative=False)
+        for e in l:
+            t_iterative.insert(e)
+            t_recursive.insert(e)
+        for e in range(-1, 2001):
+            found_iterative, node_iterative = t_iterative.find(e)
+            found_recursive, node_recursive = t_recursive.find(e)
+            self.assertEqual(found_recursive, found_iterative)
+            self.assertEqual(node_recursive and node_recursive.value, node_iterative and node_iterative.value)
+            self.assertEqual(e in l, found_iterative)
 
 
 if __name__ == '__main__':
