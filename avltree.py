@@ -23,6 +23,8 @@ class AVLTree:
         Is in the interval [-1..1]
         :param less_than_func: Function taking two parameters of same type as values in the tree.
             Returns True if and only if the first parameter is evaluated to be less then the second
+        :param iterative: If True, insert, delete and find use the iterative routines,
+            otherwise the recursive ones. Both give identical trees and results
         """
         self.head = None
         self.less_than_func = less_than_func
@@ -30,8 +32,12 @@ class AVLTree:
         self.inc = 0
         if iterative:
             self.insertion_method = self._iterative_insert
+            self.deletion_method = self._iterative_delete
+            self.find_method = self._iterative_find
         else:
             self.insertion_method = self._recursive_insert
+            self.deletion_method = self._recursive_delete
+            self.find_method = self._recursive_find
 
     def _adjust_pointers(self, parent_node, current_node, new_node):
         """
@@ -221,8 +227,8 @@ class AVLTree:
 
     def insert(self, value):
         """
-        Public routine for inserting value in to the tree. Uses modules or recursive approach
-        as
+        Public routine for inserting value in to the tree. Uses the iterative or recursive
+        routine, as chosen when the tree was created
         :param value: Value to be inserted in tree
         :return: None
         """
@@ -230,6 +236,64 @@ class AVLTree:
             self.head = AVLNode(value)
         else:
             self.insertion_method(self.head, self.head, value)
+
+    def _iterative_delete(self, parent_node, current_node, value):
+        """
+        The iterative version of the deletion from an AVL tree. It gives the same tree as
+        _recursive_delete: a node without a left subtree is replaced by its right subtree; otherwise
+        its value is replaced by the largest value in its left subtree, and that node is removed.
+        The nodes visited on the way down are remembered together with the direction taken, so the
+        balance factors can be adjusted on the way back up without searching
+        :param parent_node: Not used; kept so both deletion methods are called the same way
+        :param current_node: The current place in the tree (the head when called from delete)
+        :param value: The value to be deleted from the tree
+        :return: None
+        """
+        path = []  # (node, went_left) for every node above the node that is removed, head first
+        while current_node:
+            if self.less_than_func(value, current_node.value):
+                path.append((current_node, True))
+                current_node = current_node.left
+            elif self.less_than_func(current_node.value, value):
+                path.append((current_node, False))
+                current_node = current_node.right
+            else:
+                break
+        if not current_node:
+            raise ValueError(f"{value} not found in tree!")
+        if not current_node.left:
+            parent_node = path[-1][0] if path else current_node  # the head is its own parent, as in delete
+            self._adjust_pointers(parent_node, current_node, current_node.right)
+        else:
+            # Replace the value with the largest value in the left subtree and remove that node instead
+            to_be_deleted_value_node = current_node
+            path.append((current_node, True))
+            current_node = current_node.left
+            while current_node.right:
+                path.append((current_node, False))
+                current_node = current_node.right
+            to_be_deleted_value_node.value = current_node.value
+            self._adjust_pointers(path[-1][0], current_node, current_node.left)
+        for i in range(len(path) - 1, -1, -1):
+            # The subtree on the side we went down has become lower; re-balance on the way back up
+            current_node, went_left = path[i]
+            parent_node = path[i - 1][0] if i > 0 else current_node
+            self.inc = 1 if went_left else -1
+            if current_node.balance == 0:
+                current_node.balance = self.inc
+                self.inc = 0
+            elif current_node.balance == -self.inc:
+                current_node.balance = 0
+                self.inc = -1
+            elif current_node.balance == self.inc:
+                if (self.inc == -1 and current_node.left.balance == -current_node.balance) or \
+                        (self.inc == 1 and current_node.right.balance == -current_node.balance):
+                    self._doublerotation(parent_node, current_node)
+                    self.inc = -1
+                else:
+                    self._singlerotation(parent_node, current_node, delete=True)
+            if self.inc == 0:
+                break
 
     def _recursive_delete(self, parent_node, current_node, value):
         if self.to_be_deleted_value_node:  # Value to be deleted found further up in the tree
@@ -286,7 +350,23 @@ class AVLTree:
         if not self.head:
             raise ValueError("Trying to delete from an empty tree!")
         self.to_be_deleted_value_node = None
-        self._recursive_delete(self.head, self.head, value)
+        self.deletion_method(self.head, self.head, value)
+
+    def _iterative_find(self, current_node, value):
+        """
+        The iterative version of finding value in the tree
+        :param current_node: The current place in the tree (the head when called from find)
+        :param value: The value to look for
+        :return: (True, node holding value) if found, otherwise (False, None)
+        """
+        while current_node:
+            if self.less_than_func(value, current_node.value):
+                current_node = current_node.left
+            elif self.less_than_func(current_node.value, value):
+                current_node = current_node.right
+            else:
+                return True, current_node
+        return False, None
 
     def _recursive_find(self, current_node, value):
         if current_node:
@@ -299,7 +379,7 @@ class AVLTree:
 
     def find(self, value):
         if self.head:
-            return self._recursive_find(self.head, value)
+            return self.find_method(self.head, value)
         return False, None
 
     def inorder(self):
